@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>The Study Ledger</title>
+<meta name="theme-color" content="#0A192F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Study Ledger">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --paper:#0A192F; --paper-card:#112240; --ink:#EAF2FF; --ink-soft:#8B9BB4;
+    --rule:#20304C; --red-rule:#3ECF8E; --teal:#2ED9A3;
+  }
+  html[data-theme="light"]{
+    --paper:#F3ECD9; --paper-card:#FFFCF3; --ink:#232B3D; --ink-soft:#5B6478;
+    --rule:#CFC3A0; --red-rule:#A3372C; --teal:#2C6C5F;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:repeating-linear-gradient(180deg, transparent, transparent 27px, var(--rule) 28px), var(--paper);
+    color:var(--ink); font-family:'Inter',sans-serif; padding:0 0 calc(78px + env(safe-area-inset-bottom)); transition:background 0.2s, color 0.2s;
+    -webkit-tap-highlight-color:transparent;
+  }
+  header{padding:calc(14px + env(safe-area-inset-top)) 16px 14px;background:var(--paper);position:sticky;top:0;z-index:40;}
+  .cover{max-width:920px;margin:0 auto;border:2px solid var(--ink);background:var(--paper-card);padding:16px 18px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px;position:relative;}
+  .cover-title{font-family:'Source Serif 4',serif;font-weight:700;font-size:20px;letter-spacing:0.2px;margin:0;}
+  .cover-sub{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);margin-top:5px;letter-spacing:0.4px;text-transform:uppercase;}
+  .meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);text-align:right;line-height:1.7;display:none;}
+  .meta b{color:var(--ink);}
+  @media (min-width:480px){ .meta{display:block;} }
+  .theme-toggle{position:absolute;top:-12px;left:-12px;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--ink);background:var(--paper-card);color:var(--ink);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;}
+  .theme-toggle:focus-visible{outline:2px solid var(--red-rule);outline-offset:2px;}
+  .stamp{position:absolute;top:-12px;right:-12px;width:74px;height:74px;border-radius:50%;border:2px dashed currentColor;display:flex;align-items:center;justify-content:center;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:0.4px;transform:rotate(-9deg);line-height:1.25;background:var(--paper-card);}
+  .stamp.ok{color:var(--teal);} .stamp.warn{color:var(--red-rule);}
+
+  .bottom-nav{
+    position:fixed;left:0;right:0;bottom:0;z-index:100;
+    display:flex;background:var(--paper-card);border-top:1.5px solid var(--rule);
+    padding-bottom:env(safe-area-inset-bottom);
+    box-shadow:0 -2px 12px rgba(0,0,0,0.25);
+  }
+  .bottom-nav button{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    padding:9px 2px 7px;background:none;border:none;color:var(--ink-soft);cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:0.3px;text-transform:uppercase;
+  }
+  .bottom-nav button .icon{font-size:19px;line-height:1;}
+  .bottom-nav button.active{color:var(--red-rule);}
+  .bottom-nav button:focus-visible{outline:2px solid var(--red-rule);outline-offset:-2px;}
+
+  main.panel{max-width:920px;margin:0 auto;border:1.5px solid var(--ink);border-top:none;background:var(--paper-card);padding:20px 16px 28px;}
+  .tabpage{display:none;} .tabpage.active{display:block;}
+  h2.section{font-family:'Source Serif 4',serif;font-size:19px;font-weight:600;margin:0 0 4px;}
+  p.section-note{font-size:13px;color:var(--ink-soft);margin:0 0 18px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  @media (max-width:600px){.row2,.row3{grid-template-columns:1fr;}}
+  label{font-size:11.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);display:block;margin-bottom:4px;font-family:'IBM Plex Mono',monospace;}
+  input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{width:100%;border:none;border-bottom:1.5px solid var(--rule);background:transparent;padding:8px 2px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--ink);}
+  select{background:var(--paper-card);} select option{background:var(--paper-card);color:var(--ink);}
+  input:focus,select:focus,textarea:focus{outline:none;border-bottom-color:var(--red-rule);}
+  textarea{resize:vertical;min-height:52px;font-family:'Inter',sans-serif;font-size:13.5px;}
+  .field{margin-bottom:14px;}
+
+  .session-card{border:1.5px solid var(--rule);border-left-width:4px;padding:16px;margin-bottom:16px;position:relative;}
+  .session-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .time-and-badge{display:flex;align-items:center;gap:10px;}
+  .time-and-badge input[type=time]{width:auto;min-width:110px;}
+  .period-badge{font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.5px;text-transform:uppercase;padding:5px 10px;border:1px solid var(--rule);white-space:nowrap;}
+  button.remove-session{border:1px solid var(--rule);background:transparent;color:var(--ink-soft);cursor:pointer;padding:6px 10px;font-size:12px;font-family:'IBM Plex Mono',monospace;}
+  button.remove-session:hover{color:var(--red-rule);border-color:var(--red-rule);}
+
+  .mic-row{display:flex;gap:8px;align-items:center;}
+  button.mic{border:1.5px solid var(--ink);background:var(--paper-card);color:var(--ink);width:34px;height:34px;border-radius:50%;cursor:pointer;flex-shrink:0;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;}
+  button.mic.listening{background:var(--red-rule);color:var(--paper);border-color:var(--red-rule);}
+  button.mic:focus-visible{outline:2px solid var(--red-rule);outline-offset:2px;}
+  .voice-note{font-size:11px;color:var(--ink-soft);margin-top:4px;}
+  input[type=range]{width:100%;accent-color:var(--red-rule);}
+  .range-val{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;}
+  .btn{font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;background:var(--ink);color:var(--paper);border:none;padding:12px 22px;cursor:pointer;}
+  .btn:hover{background:var(--red-rule);color:var(--paper);}
+  .btn:focus-visible{outline:2px solid var(--red-rule);outline-offset:2px;}
+  .btn.small{padding:8px 14px;font-size:11.5px;}
+  .btn.ghost{background:transparent;color:var(--ink);border:1.5px dashed var(--ink);width:100%;margin-bottom:20px;}
+  .btn.ghost:hover{background:transparent;color:var(--red-rule);border-color:var(--red-rule);}
+  .save-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+  .save-status{font-size:12px;color:var(--teal);font-family:'IBM Plex Mono',monospace;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:8px 6px;border-bottom:1px solid var(--rule);text-align:left;}
+  th{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);}
+  td.num{font-family:'IBM Plex Mono',monospace;}
+  .stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+  @media (max-width:700px){.stat-cards{grid-template-columns:1fr 1fr;}}
+  .stat-card{border:1px solid var(--rule);padding:14px;}
+  .stat-card .num{font-family:'Source Serif 4',serif;font-size:26px;font-weight:600;}
+  .stat-card .lab{font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;color:var(--ink-soft);letter-spacing:0.5px;margin-top:2px;}
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .bar-label{width:150px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bar-track{flex:1;height:14px;background:var(--paper);border:1px solid var(--rule);}
+  .bar-fill{height:100%;}
+  .bar-val{width:56px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;flex-shrink:0;}
+  .insight{border-left:4px solid var(--red-rule);padding:10px 14px;margin-bottom:12px;background:var(--paper);}
+  .insight b{font-family:'Source Serif 4',serif;}
+  .insight.ok{border-color:var(--teal);}
+  .empty{font-size:13px;color:var(--ink-soft);font-style:italic;}
+  .banner{border:1.5px dashed var(--red-rule);padding:14px 16px;margin-bottom:20px;font-size:13px;}
+  .banner b{font-family:'Source Serif 4',serif;}
+
+  .chip-list{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 18px;}
+  .chip{display:flex;align-items:center;gap:8px;border:1.5px solid var(--rule);padding:6px 10px;font-size:13px;font-family:'IBM Plex Mono',monospace;}
+  .chip .swatch{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .chip input.chip-name{border:none;background:transparent;color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:13px;width:auto;max-width:180px;padding:0;border-bottom:none;}
+  .chip button.remove{border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;}
+  .chip button.remove:hover{color:var(--red-rule);}
+  .add-row{display:flex;gap:8px;margin-bottom:24px;}
+  .add-row input{flex:1;}
+  .settings-save{margin-top:10px;}
+
+  .syl-file-row{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+  .syl-file-row input[type=file]{font-family:'Inter',sans-serif;font-size:12.5px;color:var(--ink-soft);}
+  .topic-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--rule);padding:8px 10px;margin-bottom:6px;}
+  .topic-row label{display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;font-size:13.5px;font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0;color:var(--ink);margin:0;}
+  .topic-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--teal);flex-shrink:0;}
+  .topic-row button.remove{border:none;background:transparent;color:var(--ink-soft);cursor:pointer;font-size:14px;flex-shrink:0;}
+  .topic-row button.remove:hover{color:var(--red-rule);}
+  .topic-done span{text-decoration:line-through;color:var(--ink-soft);}
+  .syl-status{font-size:11.5px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;margin-top:4px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="cover">
+    <button class="theme-toggle" id="theme-toggle" title="Toggle theme">🌙</button>
+    <div>
+      <p class="cover-title" id="cover-title">The Study Ledger</p>
+      <p class="cover-sub" id="cover-sub">Personal Study &amp; Attendance Tracker</p>
+    </div>
+    <div class="meta">
+      Target Attendance: <b id="meta-att-target">75%</b><br>
+      Daily Study Target: <b id="meta-hrs-target">4–4.5 hrs</b>
+    </div>
+    <div id="stamp" class="stamp ok">— NO DATA YET —</div>
+  </div>
+</header>
+
+<nav class="bottom-nav">
+  <button class="tab-btn active" data-tab="today"><span class="icon">📝</span>Today</button>
+  <button class="tab-btn" data-tab="weekly"><span class="icon">📊</span>Weekly</button>
+  <button class="tab-btn" data-tab="insights"><span class="icon">💡</span>Insights</button>
+  <button class="tab-btn" data-tab="syllabus"><span class="icon">📘</span>Syllabus</button>
+  <button class="tab-btn" data-tab="settings"><span class="icon">⚙️</span>Settings</button>
+</nav>
+
+<main class="panel">
+
+  <!-- TODAY -->
+  <section class="tabpage active" id="tab-today">
+    <h2 class="section">Daily Entry</h2>
+    <p class="section-note">Log each study session with the time you did it — the time-of-day tag (Morning, Afternoon, Evening, Night, Late Night) is worked out for you automatically.</p>
+    <div id="today-banner"></div>
+
+    <div class="row2">
+      <div class="field"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="field"><label>Day</label><input type="text" id="f-day" disabled></div>
+    </div>
+
+    <div class="row3">
+      <div class="field"><label id="lab-scheduled">Classes Scheduled</label><input type="number" min="0" id="f-scheduled" placeholder="0"></div>
+      <div class="field"><label id="lab-attended">Classes Attended</label><input type="number" min="0" id="f-attended" placeholder="0"></div>
+      <div class="field"><label>Today's Attendance %</label><input type="text" id="f-att-pct" disabled placeholder="—"></div>
+    </div>
+
+    <h2 class="section" style="font-size:16px;margin-top:22px;">Study Sessions</h2>
+    <div id="sessions"></div>
+    <button type="button" class="btn ghost" id="add-session-btn">+ Add Study Session</button>
+
+    <div class="row2">
+      <div class="field"><label>Total Study Hours (today)</label><input type="text" id="f-total-hours" disabled></div>
+      <div class="field"><label>Practice Questions Solved</label><input type="number" min="0" id="f-mcqs" placeholder="0"></div>
+    </div>
+
+    <h2 class="section" style="margin-top:20px;">Daily Reflection</h2>
+    <div class="field">
+      <label>Energy Level: <span class="range-val" id="energy-val">6</span>/10</label>
+      <input type="range" min="1" max="10" value="6" id="f-energy">
+    </div>
+    <div class="row2">
+      <div class="field"><label>Distractions Faced</label><input type="text" id="f-distract" placeholder="e.g. phone notifications, noise"></div>
+      <div class="field"><label>One Improvement for Tomorrow</label><input type="text" id="f-improve" placeholder="e.g. start first session 15 min earlier"></div>
+    </div>
+
+    <div class="save-row">
+      <button class="btn" id="save-btn">Save Today's Entry</button>
+      <span class="save-status" id="save-status"></span>
+    </div>
+  </section>
+
+  <!-- WEEKLY -->
+  <section class="tabpage" id="tab-weekly">
+    <h2 class="section">Weekly Ledger</h2>
+    <p class="section-note">Rolling summary of your last 7 logged days.</p>
+    <div class="stat-cards" id="week-stats"></div>
+    <h2 class="section" style="font-size:15px;">Subject-Wise Hours</h2>
+    <div id="subject-bars" style="margin-bottom:24px;"></div>
+    <h2 class="section" style="font-size:15px;">Time-of-Day Performance</h2>
+    <p class="section-note">Based on the actual clock time you logged each session at.</p>
+    <div id="period-bars" style="margin-bottom:24px;"></div>
+    <h2 class="section" style="font-size:15px;">Daily Log</h2>
+    <table id="week-table">
+      <thead><tr><th>Date</th><th>Day</th><th>Attend.</th><th class="num">Hrs</th><th class="num">Avg Qual.</th><th class="num">Qs</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- INSIGHTS -->
+  <section class="tabpage" id="tab-insights">
+    <h2 class="section">AI Insights & Action Plan</h2>
+    <p class="section-note">Computed live from your logged entries.</p>
+    <div id="insights-list"></div>
+  </section>
+
+  <!-- SYLLABUS -->
+  <section class="tabpage" id="tab-syllabus">
+    <h2 class="section">Syllabus Tracker</h2>
+    <p class="section-note">Upload your syllabus (PDF or text) or paste it in, break it into topics, and check them off as you cover them. Your progress feeds into Insights automatically.</p>
+
+    <div class="field"><label>Subject</label><select id="syl-subject"></select></div>
+
+    <div class="syl-file-row">
+      <label>Upload Syllabus (PDF or .txt)</label>
+      <input type="file" id="syl-file" accept=".pdf,.txt">
+      <span class="syl-status" id="syl-file-status"></span>
+    </div>
+
+    <div class="field">
+      <label>Syllabus Text</label>
+      <textarea id="syl-text" style="min-height:120px;" placeholder="Paste your syllabus here, or upload a file above. One topic per line works best — bullet points and numbering are stripped automatically."></textarea>
+    </div>
+    <button class="btn small" id="syl-parse-btn">Break into Topics</button>
+
+    <h2 class="section" style="font-size:15px;margin-top:24px;">Coverage</h2>
+    <p class="section-note">✨ Topics are checked off automatically from your daily session descriptions — powered by AI. You can also check/uncheck manually anytime.</p>
+    <div class="save-row" style="margin-bottom:14px;">
+      <button class="btn small" id="syl-ai-match-btn">🤖 Auto-check from today's sessions</button>
+      <span class="syl-status" id="syl-ai-status"></span>
+    </div>
+    <div id="syl-progress"></div>
+    <div id="syl-topics" style="margin-top:10px;"></div>
+    <div class="add-row">
+      <input type="text" id="syl-new-topic" placeholder="Add a topic manually...">
+      <button class="btn small" id="syl-add-topic-btn">Add</button>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="tabpage" id="tab-settings">
+    <h2 class="section">Settings</h2>
+    <p class="section-note">This ledger works for any subject, course, or exam. Quick setup: <b>1)</b> add your subjects below, <b>2)</b> set your targets, <b>3)</b> hit Save Settings. Takes under a minute.</p>
+
+    <div class="row2">
+      <div class="field"><label>Your Name</label><input type="text" id="s-name" placeholder="e.g. Priya Sharma"></div>
+      <div class="field"><label>What are you preparing for? (optional)</label><input type="text" id="s-subtitle" placeholder="e.g. CA Foundation, NEET, Bar Exam, a coding bootcamp"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Institution / Organization (optional)</label><input type="text" id="s-college" placeholder="e.g. your college, school, or company"></div>
+      <div class="field"><label>What do you call a session?</label><input type="text" id="s-att-label" placeholder="e.g. Classes, Lectures, Shifts, Meetings"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Attendance Target (%)</label><input type="number" min="0" max="100" id="s-att-target" placeholder="75"></div>
+      <div class="field"><label>Daily Study Target (hrs, low–high)</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="number" step="0.25" min="0" id="s-hrs-low" placeholder="4">
+          <span style="color:var(--ink-soft)">–</span>
+          <input type="number" step="0.25" min="0" id="s-hrs-high" placeholder="4.5">
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section" style="font-size:15px;margin-top:10px;">Course / Program</h2>
+    <p class="section-note">This tells the ledger what you're studying — it shapes the subject suggestions and shows up in your header.</p>
+    <div class="field"><label>Course / Program</label><input type="text" id="s-course" placeholder="e.g. B.Com (Hons), B.Tech CSE, B.Sc Physics, MBBS"></div>
+
+    <h2 class="section" style="font-size:15px;margin-top:10px;" id="subjects-heading">Subjects</h2>
+    <p class="section-note" id="subjects-note">Add exactly the subjects you track — nothing pre-set. These drive your entry form and charts.</p>
+    <div class="chip-list" id="subject-chips"></div>
+    <div class="add-row">
+      <input type="text" id="new-subject-name" placeholder="Type a subject name and press Add...">
+      <button class="btn small" id="add-subject-btn">Add</button>
+    </div>
+
+    <button class="btn settings-save" id="save-settings-btn">Save Settings</button>
+    <span class="save-status" id="settings-status" style="margin-left:12px;"></span>
+  </section>
+
+</main>
+
+<datalist id="topic-suggestions"></datalist>
+
+<script>
+const COLOR_PALETTE = ['#D9A653','#C97575','#5FBFAA','#A9B96B','#8FA6D9','#C98FD9','#D98F5A','#8FD9C9','#D98FAF','#B8D98F'];
+
+// Fixed time-of-day bands — derived from the clock, never configured by the user.
+const TIME_PERIODS = [
+  {key:'morning',   label:'Morning',    icon:'🌅', test:h=> h>=5  && h<12},
+  {key:'afternoon', label:'Afternoon',  icon:'☀️', test:h=> h>=12 && h<17},
+  {key:'evening',   label:'Evening',    icon:'🌇', test:h=> h>=17 && h<21},
+  {key:'night',     label:'Night',      icon:'🌙', test:h=> h>=21 && h<=23},
+  {key:'latenight', label:'Late Night', icon:'🌌', test:h=> h>=0  && h<5}
+];
+function periodFor(timeStr){
+  if(!timeStr) return null;
+  const h = parseInt(timeStr.split(':')[0], 10);
+  if(isNaN(h)) return null;
+  return TIME_PERIODS.find(p=>p.test(h)) || null;
+}
+function badgeHtml(timeStr){
+  const p = periodFor(timeStr);
+  return p ? `${p.icon} ${p.label}` : '— set a time —';
+}
+
+const DEFAULT_SETTINGS = {
+  name:'', course:'', subtitle:'', college:'', attendanceLabel:'Classes',
+  attendanceTarget:75, hoursLow:4, hoursHigh:4.5,
+  subjects: []
+};
+let SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+let sessions = []; // in-memory sessions for the date currently open
+
+function pad(n){return n.toString().padStart(2,'0');}
+function todayISO(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function nowHHMM(){const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes());}
+function dayName(iso){const d=new Date(iso+'T00:00:00');return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];}
+function slugify(name){ return 's_' + name.toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,20) + '_' + Math.random().toString(36).slice(2,6); }
+function genId(){ return 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); }
+function nextColor(){ return COLOR_PALETTE[SETTINGS.subjects.length % COLOR_PALETTE.length]; }
+
+// ---------- Theme ----------
+async function loadTheme(){
+  try{
+    const res = await window.storage.get('theme', false);
+    document.documentElement.setAttribute('data-theme', res.value);
+    document.getElementById('theme-toggle').textContent = res.value==='dark' ? '☀️' : '🌙';
+  }catch(e){
+    document.documentElement.setAttribute('data-theme','dark');
+    document.getElementById('theme-toggle').textContent = '☀️';
+  }
+}
+document.getElementById('theme-toggle').addEventListener('click', async ()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur==='dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  document.getElementById('theme-toggle').textContent = next==='dark' ? '☀️' : '🌙';
+  try{ await window.storage.set('theme', next, false); }catch(e){}
+});
+
+// ---------- Settings load/save ----------
+async function loadSettings(){
+  try{
+    const res = await window.storage.get('settings', false);
+    SETTINGS = JSON.parse(res.value);
+    if(!SETTINGS.subjects) SETTINGS.subjects = [];
+    if(!SETTINGS.attendanceLabel) SETTINGS.attendanceLabel = 'Classes';
+  }catch(e){
+    SETTINGS = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  }
+  applySettingsToUI();
+}
+async function saveSettings(){
+  const statusEl = document.getElementById('settings-status');
+  SETTINGS.name = document.getElementById('s-name').value;
+  SETTINGS.course = document.getElementById('s-course').value;
+  SETTINGS.subtitle = document.getElementById('s-subtitle').value;
+  SETTINGS.college = document.getElementById('s-college').value;
+  SETTINGS.attendanceLabel = document.getElementById('s-att-label').value || 'Classes';
+  SETTINGS.attendanceTarget = parseFloat(document.getElementById('s-att-target').value) || 75;
+  SETTINGS.hoursLow = parseFloat(document.getElementById('s-hrs-low').value) || 4;
+  SETTINGS.hoursHigh = parseFloat(document.getElementById('s-hrs-high').value) || 4.5;
+  document.querySelectorAll('.chip').forEach(chip=>{
+    const s = SETTINGS.subjects.find(x=>x.id===chip.dataset.id);
+    const nameInput = chip.querySelector('.chip-name');
+    if(s && nameInput) s.name = nameInput.value || s.name;
+  });
+  try{
+    const result = await window.storage.set('settings', JSON.stringify(SETTINGS), false);
+    statusEl.textContent = result ? 'Saved ✓' : 'Save failed — try again.';
+  }catch(e){ statusEl.textContent = 'Save error — try again.'; }
+  applySettingsToUI();
+  renderSessions();
+  await loadSyllabusMap();
+  populateSyllabusSubjectSelect();
+  await refreshWeekly(); await refreshInsights(); await refreshStamp();
+}
+
+function applySettingsToUI(){
+  document.getElementById('cover-title').textContent = SETTINGS.name ? SETTINGS.name + '\u2019s Study Ledger' : 'The Study Ledger';
+  const subParts = [SETTINGS.college, SETTINGS.course, SETTINGS.subtitle].filter(Boolean);
+  document.getElementById('cover-sub').textContent = subParts.length ? subParts.join(' \u00b7 ') : 'Personal Study & Attendance Tracker';
+  document.getElementById('meta-att-target').textContent = SETTINGS.attendanceTarget + '%';
+  document.getElementById('meta-hrs-target').textContent = SETTINGS.hoursLow + '\u2013' + SETTINGS.hoursHigh + ' hrs';
+  document.getElementById('lab-scheduled').textContent = SETTINGS.attendanceLabel + ' Scheduled';
+  document.getElementById('lab-attended').textContent = SETTINGS.attendanceLabel + ' Attended';
+
+  document.getElementById('s-name').value = SETTINGS.name || '';
+  document.getElementById('s-course').value = SETTINGS.course || '';
+  document.getElementById('s-subtitle').value = SETTINGS.subtitle || '';
+  document.getElementById('s-college').value = SETTINGS.college || '';
+  document.getElementById('s-att-label').value = SETTINGS.attendanceLabel || 'Classes';
+  document.getElementById('s-att-target').value = SETTINGS.attendanceTarget;
+  document.getElementById('s-hrs-low').value = SETTINGS.hoursLow;
+  document.getElementById('s-hrs-high').value = SETTINGS.hoursHigh;
+
+  document.getElementById('subjects-heading').textContent = SETTINGS.course ? 'Subjects for ' + SETTINGS.course : 'Subjects';
+  document.getElementById('subjects-note').textContent = SETTINGS.course
+    ? `Add exactly the subjects you're taking in ${SETTINGS.course} — nothing pre-set. These drive your entry form and charts.`
+    : `Add exactly the subjects, papers, or topics you track — nothing pre-set. These drive your entry form and charts.`;
+
+  renderSubjectChips();
+
+  const banner = document.getElementById('today-banner');
+  banner.innerHTML = SETTINGS.subjects.length===0
+    ? `<div class="banner"><b>Welcome! Let's set this up — takes under a minute.</b><br>Add whatever you're studying (subjects, papers, skills) so your log and charts know what to track.<br><button type="button" class="btn small" id="goto-settings-btn" style="margin-top:10px;">Get Started →</button></div>`
+    : '';
+  const gotoBtn = document.getElementById('goto-settings-btn');
+  if(gotoBtn){
+    gotoBtn.addEventListener('click', ()=>{
+      document.querySelector('.tab-btn[data-tab="settings"]').click();
+      document.getElementById('new-subject-name').focus();
+    });
+  }
+}
+
+function renderSubjectChips(){
+  const wrap = document.getElementById('subject-chips');
+  wrap.innerHTML = SETTINGS.subjects.length===0
+    ? `<span class="empty">No subjects added yet.</span>`
+    : SETTINGS.subjects.map(s=>`
+      <div class="chip" data-id="${s.id}">
+        <span class="swatch" style="background:${s.color}"></span>
+        <input type="text" class="chip-name" value="${s.name.replace(/"/g,'&quot;')}">
+        <button type="button" class="remove" data-remove="${s.id}" title="Remove">✕</button>
+      </div>`).join('');
+  wrap.querySelectorAll('button.remove').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      SETTINGS.subjects = SETTINGS.subjects.filter(s=>s.id !== btn.dataset.remove);
+      renderSubjectChips();
+    });
+  });
+}
+document.getElementById('add-subject-btn').addEventListener('click', ()=>{
+  const input = document.getElementById('new-subject-name');
+  const name = input.value.trim();
+  if(!name) return;
+  SETTINGS.subjects.push({id: slugify(name), name, color: nextColor()});
+  input.value = '';
+  renderSubjectChips();
+});
+document.getElementById('new-subject-name').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('add-subject-btn').click(); }
+});
+document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
+
+// ---------- Syllabus ----------
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+let SYLLABUS_DATA = {};  // subjectId -> {rawText, topics:[{id,text,done}]}
+let currentSyllabusSubject = null;
+let currentTopics = [];
+
+async function loadSyllabusMap(){
+  const map = {};
+  for(const s of SETTINGS.subjects){
+    try{
+      const res = await window.storage.get('syllabus:'+s.id, false);
+      map[s.id] = JSON.parse(res.value);
+    }catch(e){
+      map[s.id] = {rawText:'', topics:[]};
+    }
+  }
+  SYLLABUS_DATA = map;
+}
+
+function updateTopicSuggestions(subjectId){
+  const dl = document.getElementById('topic-suggestions');
+  const topics = (SYLLABUS_DATA[subjectId] && SYLLABUS_DATA[subjectId].topics) || [];
+  dl.innerHTML = topics.map(t=>`<option value="${t.text.replace(/"/g,'&quot;')}"></option>`).join('');
+}
+
+function populateSyllabusSubjectSelect(){
+  const sel = document.getElementById('syl-subject');
+  if(SETTINGS.subjects.length===0){
+    sel.innerHTML = '<option value="">Add subjects in Settings first</option>';
+    currentSyllabusSubject = null;
+    currentTopics = [];
+    document.getElementById('syl-text').value = '';
+    renderSyllabusTopics();
+    return;
+  }
+  const keepId = SETTINGS.subjects.some(s=>s.id===currentSyllabusSubject) ? currentSyllabusSubject : SETTINGS.subjects[0].id;
+  sel.innerHTML = SETTINGS.subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  sel.value = keepId;
+  currentSyllabusSubject = keepId;
+  loadSyllabusForSubject(currentSyllabusSubject);
+}
+document.getElementById('syl-subject').addEventListener('change', e=>{
+  currentSyllabusSubject = e.target.value;
+  loadSyllabusForSubject(currentSyllabusSubject);
+});
+
+function loadSyllabusForSubject(subjectId){
+  const data = SYLLABUS_DATA[subjectId] || {rawText:'', topics:[]};
+  currentTopics = data.topics || [];
+  document.getElementById('syl-text').value = data.rawText || '';
+  renderSyllabusTopics();
+}
+
+async function saveSyllabus(){
+  if(!currentSyllabusSubject) return;
+  const rawText = document.getElementById('syl-text').value;
+  const data = {rawText, topics: currentTopics};
+  SYLLABUS_DATA[currentSyllabusSubject] = data;
+  try{ await window.storage.set('syllabus:'+currentSyllabusSubject, JSON.stringify(data), false); }catch(e){}
+}
+
+function renderSyllabusTopics(){
+  const progressEl = document.getElementById('syl-progress');
+  const wrap = document.getElementById('syl-topics');
+  const total = currentTopics.length;
+  const done = currentTopics.filter(t=>t.done).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  progressEl.innerHTML = total
+    ? `<div class="bar-row"><div class="bar-label">Coverage</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--teal)"></div></div><div class="bar-val">${pct}%</div></div><p class="section-note" style="margin:6px 0 0;">${done} of ${total} topics covered</p>`
+    : `<p class="empty">No topics yet — paste or upload a syllabus above, then hit "Break into Topics".</p>`;
+  wrap.innerHTML = currentTopics.map(t=>`
+    <div class="topic-row">
+      <label class="${t.done?'topic-done':''}">
+        <input type="checkbox" class="topic-check" data-id="${t.id}" ${t.done?'checked':''}>
+        <span>${t.text}</span>
+      </label>
+      <button type="button" class="remove" data-remove-topic="${t.id}">✕</button>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('.topic-check').forEach(cb=>{
+    cb.addEventListener('change', async ()=>{
+      const t = currentTopics.find(x=>x.id===cb.dataset.id);
+      if(t){ t.done = cb.checked; renderSyllabusTopics(); await saveSyllabus(); await refreshInsights(); }
+    });
+  });
+  wrap.querySelectorAll('button[data-remove-topic]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      currentTopics = currentTopics.filter(t=>t.id!==btn.dataset.removeTopic);
+      renderSyllabusTopics();
+      await saveSyllabus();
+    });
+  });
+}
+
+document.getElementById('syl-parse-btn').addEventListener('click', async ()=>{
+  const text = document.getElementById('syl-text').value;
+  const lines = text.split('\n')
+    .map(l=>l.replace(/^[\s\-\u2022\*\d]+[\.\)]?\s*/,'').trim())
+    .filter(l=>l.length>1);
+  const existingDone = {};
+  currentTopics.forEach(t=>{ existingDone[t.text.toLowerCase()] = t.done; });
+  currentTopics = lines.map(l=>({
+    id: 'top_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+    text: l,
+    done: existingDone[l.toLowerCase()] || false
+  }));
+  renderSyllabusTopics();
+  await saveSyllabus();
+  if(currentSyllabusSubject) updateTopicSuggestions(currentSyllabusSubject);
+});
+
+document.getElementById('syl-add-topic-btn').addEventListener('click', async ()=>{
+  const input = document.getElementById('syl-new-topic');
+  const text = input.value.trim();
+  if(!text) return;
+  currentTopics.push({id:'top_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), text, done:false});
+  input.value = '';
+  renderSyllabusTopics();
+  await saveSyllabus();
+});
+
+document.getElementById('syl-file').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  const statusEl = document.getElementById('syl-file-status');
+  if(!file) return;
+  statusEl.textContent = 'Reading ' + file.name + '...';
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  if(isPdf){
+    if(!window.pdfjsLib){
+      statusEl.textContent = 'PDF reader unavailable — try pasting the text manually.';
+      return;
+    }
+    try{
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+      let fullText = '';
+      for(let i=1;i<=pdf.numPages;i++){
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        fullText += content.items.map(it=>it.str).join(' ') + '\n';
+      }
+      document.getElementById('syl-text').value = fullText.trim();
+      statusEl.textContent = 'Loaded ' + pdf.numPages + ' page(s) from ' + file.name + '. Review the text, then hit "Break into Topics".';
+    }catch(err){
+      statusEl.textContent = 'Could not read this PDF — try pasting the syllabus text manually instead.';
+    }
+  }else{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      document.getElementById('syl-text').value = reader.result;
+      statusEl.textContent = 'Loaded ' + file.name + '. Review the text, then hit "Break into Topics".';
+    };
+    reader.onerror = ()=>{ statusEl.textContent = 'Could not read this file — try pasting the text manually.'; };
+    reader.readAsText(file);
+  }
+});
+
+// ---------- AI syllabus matching ----------
+async function aiMatchSyllabus(){
+  const bySubject = {};
+  sessions.forEach(s=>{
+    if(s.subject && (s.desc || s.topic)){
+      if(!bySubject[s.subject]) bySubject[s.subject] = [];
+      bySubject[s.subject].push([s.topic, s.desc].filter(Boolean).join(' — '));
+    }
+  });
+  const subjectIds = Object.keys(bySubject);
+  let totalMatched = 0;
+  for(const subjId of subjectIds){
+    const syl = SYLLABUS_DATA[subjId];
+    if(!syl || !syl.topics || syl.topics.length===0) continue;
+    const pending = syl.topics.filter(t=>!t.done);
+    if(pending.length===0) continue;
+    const topicList = pending.map((t,i)=>`${i+1}. ${t.text}`).join('\n');
+    const description = bySubject[subjId].join('\n');
+    try{
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          model:'claude-sonnet-4-6',
+          max_tokens:1000,
+          messages:[{role:'user', content:
+`Syllabus topics (numbered):
+${topicList}
+
+Student's study log for today:
+${description}
+
+Return ONLY a JSON array of the topic numbers above that this log clearly shows were studied or practiced today. No explanation, no markdown — just the array, e.g. [1,3]. If nothing clearly matches, return [].`
+          }]
+        })
+      });
+      const data = await resp.json();
+      const textBlock = (data.content||[]).find(b=>b.type==='text');
+      if(!textBlock) continue;
+      const clean = textBlock.text.replace(/```json|```/g,'').trim();
+      const indices = JSON.parse(clean);
+      if(Array.isArray(indices)){
+        indices.forEach(n=>{
+          const picked = pending[n-1];
+          if(!picked) return;
+          const realTopic = syl.topics.find(x=>x.id===picked.id);
+          if(realTopic && !realTopic.done){ realTopic.done = true; totalMatched++; }
+        });
+        SYLLABUS_DATA[subjId] = syl;
+        await window.storage.set('syllabus:'+subjId, JSON.stringify(syl), false);
+      }
+    }catch(err){ /* skip this subject silently, try the rest */ }
+  }
+  if(currentSyllabusSubject) loadSyllabusForSubject(currentSyllabusSubject);
+  return totalMatched;
+}
+document.getElementById('syl-ai-match-btn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('syl-ai-status');
+  statusEl.textContent = 'Reading today\'s sessions...';
+  const matched = await aiMatchSyllabus();
+  statusEl.textContent = matched>0 ? `🤖 Matched ${matched} topic${matched>1?'s':''} just now.` : 'No new matches found in today\'s sessions.';
+  await refreshInsights();
+});
+
+// ---------- Sessions (Today tab) ----------
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function addSession(prefill){
+  const s = Object.assign({
+    id: genId(), time: nowHHMM(), subject:'', topic:'', desc:'', hours:'', quality:5
+  }, prefill||{});
+  sessions.push(s);
+  renderSessions();
+}
+function removeSession(id){
+  sessions = sessions.filter(s=>s.id!==id);
+  renderSessions();
+  recalcLive();
+}
+document.getElementById('add-session-btn').addEventListener('click', ()=>addSession());
+
+function renderSessions(){
+  const wrap = document.getElementById('sessions');
+  if(sessions.length===0){
+    wrap.innerHTML = `<p class="empty">No sessions logged yet today — tap "+ Add Study Session" below.</p>`;
+    return;
+  }
+  const subjectOptions = SETTINGS.subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  wrap.innerHTML = sessions.map((s,idx)=>{
+    const accent = SETTINGS.subjects.length ? SETTINGS.subjects[idx % SETTINGS.subjects.length].color : 'var(--rule)';
+    return `
+    <div class="session-card" data-id="${s.id}" style="border-left-color:${accent}">
+      <div class="session-head">
+        <div class="time-and-badge">
+          <input type="time" class="s-time" value="${s.time||''}">
+          <span class="period-badge" id="badge-${s.id}">${badgeHtml(s.time)}</span>
+        </div>
+        <button type="button" class="remove-session" data-remove="${s.id}">Remove</button>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Subject</label>
+          <select class="s-subject" ${SETTINGS.subjects.length===0 ? 'disabled' : ''}>
+            <option value="">${SETTINGS.subjects.length ? '— select —' : 'Add subjects in Settings'}</option>
+            ${subjectOptions}
+          </select>
+        </div>
+        <div class="field"><label>Topic</label><input type="text" class="s-topic" list="topic-suggestions" placeholder="e.g. what specifically you covered"></div>
+      </div>
+      <div class="field">
+        <label>Description</label>
+        <div class="mic-row">
+          <textarea class="s-desc" placeholder="What exactly did you study/practice? (2–3 lines)"></textarea>
+          <button type="button" class="mic" data-target="${s.id}" title="Dictate">🎙️</button>
+        </div>
+        <div class="voice-note" id="voice-note-${s.id}"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Hours Spent</label><input type="number" step="0.25" min="0" class="s-hours" placeholder="0"></div>
+        <div class="field"><label>Quality: <span class="range-val" id="qual-val-${s.id}">${s.quality}</span>/10</label>
+          <input type="range" min="1" max="10" class="s-quality" value="${s.quality}">
+          <div class="voice-note">How focused and effective it was — not how long. 1 = distracted, 10 = fully locked in.</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // bind values + listeners
+  sessions.forEach(s=>{
+    const card = wrap.querySelector(`.session-card[data-id="${s.id}"]`);
+    card.querySelector('.s-time').value = s.time;
+    card.querySelector('.s-subject').value = s.subject;
+    card.querySelector('.s-topic').value = s.topic;
+    card.querySelector('.s-desc').value = s.desc;
+    card.querySelector('.s-hours').value = s.hours;
+    card.querySelector('.s-quality').value = s.quality;
+
+    card.querySelector('.s-time').addEventListener('input', e=>{
+      s.time = e.target.value;
+      document.getElementById('badge-'+s.id).textContent = badgeHtml(s.time);
+    });
+    card.querySelector('.s-subject').addEventListener('change', e=>{ s.subject = e.target.value; updateTopicSuggestions(s.subject); });
+    if(s.subject) updateTopicSuggestions(s.subject);
+    card.querySelector('.s-topic').addEventListener('input', e=>{ s.topic = e.target.value; });
+    card.querySelector('.s-desc').addEventListener('input', e=>{ s.desc = e.target.value; });
+    card.querySelector('.s-hours').addEventListener('input', e=>{ s.hours = parseFloat(e.target.value)||0; recalcLive(); });
+    card.querySelector('.s-quality').addEventListener('input', e=>{
+      s.quality = parseInt(e.target.value)||0;
+      document.getElementById('qual-val-'+s.id).textContent = s.quality;
+    });
+    card.querySelector('button.remove-session').addEventListener('click', ()=>removeSession(s.id));
+    setupMic(s.id);
+  });
+  recalcLive();
+}
+
+function setupMic(sessionId){
+  const btn = document.querySelector(`button.mic[data-target="${sessionId}"]`);
+  const noteEl = document.getElementById('voice-note-'+sessionId);
+  if(!SpeechRec){
+    noteEl.textContent = 'Voice dictation isn\'t supported in this browser — type instead.';
+    btn.disabled = true; btn.style.opacity = 0.4; return;
+  }
+  let recognizing = false;
+  btn.addEventListener('click', ()=>{
+    if(recognizing) return;
+    const recognition = new SpeechRec();
+    recognition.lang = 'en-IN';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognizing = true;
+    btn.classList.add('listening');
+    noteEl.textContent = 'Listening...';
+    recognition.onresult = (e)=>{
+      const transcript = e.results[0][0].transcript;
+      const s = sessions.find(x=>x.id===sessionId);
+      const card = document.querySelector(`.session-card[data-id="${sessionId}"] .s-desc`);
+      s.desc = s.desc ? (s.desc + ' ' + transcript) : transcript;
+      card.value = s.desc;
+      noteEl.textContent = 'Captured. Review and edit if needed.';
+    };
+    recognition.onerror = (e)=>{ noteEl.textContent = 'Mic unavailable (' + e.error + '). You can type instead.'; };
+    recognition.onend = ()=>{ recognizing = false; btn.classList.remove('listening'); };
+    try{ recognition.start(); }
+    catch(err){ recognizing = false; btn.classList.remove('listening'); noteEl.textContent = 'Could not start mic in this environment — type instead.'; }
+  });
+}
+
+// ---------- Live calc ----------
+document.getElementById('f-energy').addEventListener('input', e=>{
+  document.getElementById('energy-val').textContent = e.target.value;
+});
+function recalcLive(){
+  const sch = parseFloat(document.getElementById('f-scheduled').value) || 0;
+  const att = parseFloat(document.getElementById('f-attended').value) || 0;
+  document.getElementById('f-att-pct').value = sch>0 ? ((att/sch)*100).toFixed(0)+'%' : '—';
+  const total = sessions.reduce((sum,s)=>sum+(parseFloat(s.hours)||0),0);
+  document.getElementById('f-total-hours').value = total.toFixed(2)+' hrs';
+}
+['f-scheduled','f-attended'].forEach(id=>document.getElementById(id).addEventListener('input', recalcLive));
+
+// ---------- Date/day init ----------
+const dateInput = document.getElementById('f-date');
+dateInput.value = todayISO();
+document.getElementById('f-day').value = dayName(dateInput.value);
+dateInput.addEventListener('change', ()=>{
+  document.getElementById('f-day').value = dayName(dateInput.value);
+  loadEntryForDate(dateInput.value);
+});
+
+// ---------- Save / Load entries ----------
+function collectEntry(){
+  return {
+    date: dateInput.value, day: document.getElementById('f-day').value,
+    scheduled: parseFloat(document.getElementById('f-scheduled').value) || 0,
+    attended: parseFloat(document.getElementById('f-attended').value) || 0,
+    sessions: sessions.map(s=>({ time:s.time, subject:s.subject, topic:s.topic, desc:s.desc, hours:parseFloat(s.hours)||0, quality:parseInt(s.quality)||0 })),
+    mcqs: parseFloat(document.getElementById('f-mcqs').value) || 0,
+    energy: parseInt(document.getElementById('f-energy').value) || 0,
+    distract: document.getElementById('f-distract').value,
+    improve: document.getElementById('f-improve').value
+  };
+}
+
+async function loadEntryForDate(iso){
+  const statusEl = document.getElementById('save-status');
+  try{
+    const res = await window.storage.get('entries:'+iso, false);
+    const e = JSON.parse(res.value);
+    document.getElementById('f-scheduled').value = e.scheduled || '';
+    document.getElementById('f-attended').value = e.attended || '';
+    sessions = (e.sessions||[]).map(s=>Object.assign({id:genId()}, s));
+    document.getElementById('f-mcqs').value = e.mcqs || '';
+    document.getElementById('f-energy').value = e.energy || 6;
+    document.getElementById('energy-val').textContent = e.energy || 6;
+    document.getElementById('f-distract').value = e.distract || '';
+    document.getElementById('f-improve').value = e.improve || '';
+    statusEl.textContent = 'Loaded existing entry for this date.';
+  }catch(err){
+    document.getElementById('f-scheduled').value = '';
+    document.getElementById('f-attended').value = '';
+    sessions = [];
+    if(SETTINGS.subjects.length>0) addSession(); // friendly default for a fresh day
+    document.getElementById('f-mcqs').value = '';
+    document.getElementById('f-energy').value = 6;
+    document.getElementById('energy-val').textContent = 6;
+    document.getElementById('f-distract').value = '';
+    document.getElementById('f-improve').value = '';
+    statusEl.textContent = '';
+  }
+  renderSessions();
+}
+
+document.getElementById('save-btn').addEventListener('click', async ()=>{
+  const statusEl = document.getElementById('save-status');
+  const entry = collectEntry();
+  try{
+    const result = await window.storage.set('entries:'+entry.date, JSON.stringify(entry), false);
+    if(result){
+      statusEl.textContent = 'Saved ✓ · checking syllabus...';
+      const matched = await aiMatchSyllabus();
+      statusEl.textContent = matched>0 ? `Saved ✓ · 🤖 matched ${matched} syllabus topic${matched>1?'s':''}` : 'Saved ✓';
+      refreshWeekly(); refreshInsights(); refreshStamp();
+    }else{ statusEl.textContent = 'Save failed — try again.'; }
+  }catch(err){ statusEl.textContent = 'Save error — try again.'; }
+});
+
+// ---------- Tabs ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tabpage').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- Data aggregation ----------
+async function getAllEntries(){
+  const list = await window.storage.list('entries:', false);
+  if(!list || !list.keys) return [];
+  const entries = [];
+  for(const key of list.keys){
+    try{ const res = await window.storage.get(key, false); entries.push(JSON.parse(res.value)); }catch(e){}
+  }
+  entries.sort((a,b)=> a.date < b.date ? 1 : -1);
+  return entries;
+}
+function last7(entries){
+  const today = new Date(todayISO()+'T00:00:00');
+  const cutoff = new Date(today); cutoff.setDate(cutoff.getDate()-6);
+  return entries.filter(e=>{ const d = new Date(e.date+'T00:00:00'); return d >= cutoff && d <= today; });
+}
+function prev7(entries){
+  const today = new Date(todayISO()+'T00:00:00');
+  const start = new Date(today); start.setDate(start.getDate()-13);
+  const end = new Date(today); end.setDate(end.getDate()-7);
+  return entries.filter(e=>{ const d = new Date(e.date+'T00:00:00'); return d >= start && d <= end; });
+}
+function currentMonth(entries){
+  const now = new Date();
+  return entries.filter(e=>{ const d = new Date(e.date+'T00:00:00'); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth(); });
+}
+function entrySessions(e){ return e.sessions || []; }
+function totalHours(entry){ return entrySessions(entry).reduce((sum,s)=>sum+(s.hours||0),0); }
+function avgQuality(entry){
+  const qs = entrySessions(entry).map(s=>s.quality).filter(q=>q);
+  return qs.length ? (qs.reduce((a,b)=>a+b,0)/qs.length) : null;
+}
+function subjectHoursMap(entries){
+  const map = {}; SETTINGS.subjects.forEach(s=>map[s.id]=0);
+  entries.forEach(e=>entrySessions(e).forEach(s=>{
+    if(s.subject && map.hasOwnProperty(s.subject)) map[s.subject] += (s.hours||0);
+  }));
+  return map;
+}
+function periodQualityMap(entries){
+  const map = {}; TIME_PERIODS.forEach(p=>map[p.key]={sum:0,n:0});
+  entries.forEach(e=>entrySessions(e).forEach(s=>{
+    const p = periodFor(s.time);
+    if(p && s.quality){ map[p.key].sum += s.quality; map[p.key].n += 1; }
+  }));
+  return map;
+}
+
+// ---------- Weekly tab ----------
+async function refreshWeekly(){
+  const all = await getAllEntries();
+  const week = last7(all);
+  const month = currentMonth(all);
+
+  const totalHrs = week.reduce((s,e)=>s+totalHours(e),0);
+  const avgHrs = week.length ? totalHrs/week.length : 0;
+  const qualities = week.map(avgQuality).filter(q=>q);
+  const avgQual = qualities.length ? qualities.reduce((a,b)=>a+b,0)/qualities.length : 0;
+  const weekSched = week.reduce((s,e)=>s+(e.scheduled||0),0);
+  const weekAtt = week.reduce((s,e)=>s+(e.attended||0),0);
+  const weekAttPct = weekSched>0 ? (weekAtt/weekSched*100) : null;
+  const monthSched = month.reduce((s,e)=>s+(e.scheduled||0),0);
+  const monthAtt = month.reduce((s,e)=>s+(e.attended||0),0);
+  const monthAttPct = monthSched>0 ? (monthAtt/monthSched*100) : null;
+
+  document.getElementById('week-stats').innerHTML = `
+    <div class="stat-card"><div class="num">${totalHrs.toFixed(1)}</div><div class="lab">Total Hrs (7d)</div></div>
+    <div class="stat-card"><div class="num">${avgHrs.toFixed(1)}</div><div class="lab">Avg Daily Hrs</div></div>
+    <div class="stat-card"><div class="num">${avgQual? avgQual.toFixed(1):'—'}</div><div class="lab">Avg Quality</div></div>
+    <div class="stat-card"><div class="num">${weekAttPct!==null? weekAttPct.toFixed(0)+'%':'—'}</div><div class="lab">Attendance (7d)</div></div>
+  `;
+
+  const subMap = subjectHoursMap(week);
+  const maxSub = Math.max(1, ...Object.values(subMap));
+  document.getElementById('subject-bars').innerHTML = SETTINGS.subjects.length ? SETTINGS.subjects.map(s=>{
+    const val = subMap[s.id]||0;
+    const pct = (val/maxSub*100).toFixed(0);
+    return `<div class="bar-row"><div class="bar-label">${s.name}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${s.color}"></div></div><div class="bar-val">${val.toFixed(1)}h</div></div>`;
+  }).join('') : '<span class="empty">Add subjects in Settings to see this chart.</span>';
+
+  const pMap = periodQualityMap(week);
+  document.getElementById('period-bars').innerHTML = TIME_PERIODS.map(p=>{
+    const avg = pMap[p.key].n ? pMap[p.key].sum/pMap[p.key].n : 0;
+    const pct = (avg/10*100).toFixed(0);
+    return `<div class="bar-row"><div class="bar-label">${p.icon} ${p.label}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--ink)"></div></div><div class="bar-val">${avg? avg.toFixed(1):'—'}</div></div>`;
+  }).join('');
+
+  const tbody = document.querySelector('#week-table tbody');
+  if(week.length===0){
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">No entries yet — save today's log to begin your ledger.</td></tr>`;
+  }else{
+    tbody.innerHTML = week.map(e=>{
+      const attPct = e.scheduled>0 ? ((e.attended/e.scheduled)*100).toFixed(0)+'%' : '—';
+      const aq = avgQuality(e);
+      return `<tr><td>${e.date}</td><td>${e.day}</td><td>${attPct}</td><td class="num">${totalHours(e).toFixed(1)}</td><td class="num">${aq?aq.toFixed(1):'—'}</td><td class="num">${e.mcqs||0}</td></tr>`;
+    }).join('');
+  }
+  window._monthAttPct = monthAttPct;
+}
+
+// ---------- Stamp ----------
+async function refreshStamp(){
+  const stamp = document.getElementById('stamp');
+  const pct = window._monthAttPct;
+  const target = SETTINGS.attendanceTarget || 75;
+  if(pct===null || pct===undefined){ stamp.textContent = '— NO DATA YET —'; stamp.className = 'stamp ok'; return; }
+  if(pct >= target){ stamp.innerHTML = `${pct.toFixed(0)}%<br>ON TRACK`; stamp.className = 'stamp ok'; }
+  else{ stamp.innerHTML = `${pct.toFixed(0)}%<br>BELOW ${target}%`; stamp.className = 'stamp warn'; }
+}
+
+// ---------- Insights ----------
+async function refreshInsights(){
+  const all = await getAllEntries();
+  const week = last7(all);
+  const prevWeek = prev7(all);
+  const list = document.getElementById('insights-list');
+
+  if(SETTINGS.subjects.length===0){
+    list.innerHTML = `<div class="insight"><b>Finish setting up first.</b> Add your subjects in Settings, then log a few sessions to unlock insights here.</div>`;
+    return;
+  }
+  if(all.length===0){
+    list.innerHTML = `<div class="insight"><b>No entries logged yet.</b><br>Save your first daily entry to unlock insights on attendance, subject balance, and study quality.</div>`;
+    return;
+  }
+  const insights = [];
+
+  const subMap = subjectHoursMap(week);
+  SETTINGS.subjects.forEach(s=>{
+    if((subMap[s.id]||0) === 0){
+      insights.push({ok:false, html:`<b>${s.name} untouched this week.</b> Zero hours logged in the last 7 days — schedule at least one focused session for it before the week ends.`});
+    }
+  });
+
+  SETTINGS.subjects.forEach(s=>{
+    const syl = SYLLABUS_DATA[s.id];
+    if(syl && syl.topics && syl.topics.length>0){
+      const total = syl.topics.length;
+      const done = syl.topics.filter(t=>t.done).length;
+      const pct = Math.round(done/total*100);
+      if(pct < 40){
+        insights.push({ok:false, html:`<b>${s.name} syllabus at ${pct}%.</b> ${total-done} of ${total} topics still pending — check them off in the Syllabus tab as you cover them.`});
+      }else if(pct >= 90){
+        insights.push({ok:true, html:`<b>${s.name} syllabus nearly done</b> — ${pct}% covered (${done}/${total} topics). Time to shift toward revision.`});
+      }
+    }
+  });
+
+  const pMap = periodQualityMap(week);
+  let weakest = null, weakestAvg = 11;
+  TIME_PERIODS.forEach(p=>{
+    if(pMap[p.key].n>0){ const avg = pMap[p.key].sum/pMap[p.key].n; if(avg < weakestAvg){ weakestAvg = avg; weakest = p; } }
+  });
+  if(weakest && weakestAvg < 6){
+    insights.push({ok:false, html:`<b>${weakest.label} sessions are underperforming.</b> Average quality is ${weakestAvg.toFixed(1)}/10 this week — check your energy and distraction notes around that time of day.`});
+  }else if(weakest){
+    let best=null, bestAvg=-1;
+    TIME_PERIODS.forEach(p=>{ if(pMap[p.key].n>0){ const avg=pMap[p.key].sum/pMap[p.key].n; if(avg>bestAvg){bestAvg=avg;best=p;} } });
+    if(best) insights.push({ok:true, html:`<b>${best.label} is your strongest time to study</b> at ${bestAvg.toFixed(1)}/10 avg quality — protect this window and give it your hardest subject.`});
+  }
+
+  const totalHrs = week.reduce((s,e)=>s+totalHours(e),0);
+  const activeDays = week.filter(e=>e.scheduled>0).length || week.length;
+  const targetLow = activeDays * (SETTINGS.hoursLow||4), targetHigh = activeDays * (SETTINGS.hoursHigh||4.5);
+  if(totalHrs < targetLow && week.length>0){
+    insights.push({ok:false, html:`<b>Study hours below target.</b> Logged ${totalHrs.toFixed(1)}h this week against a target of ${targetLow.toFixed(1)}–${targetHigh.toFixed(1)}h.`});
+  }else if(week.length>0){
+    insights.push({ok:true, html:`<b>On pace with your hours target.</b> ${totalHrs.toFixed(1)}h logged this week, within your ${targetLow.toFixed(1)}–${targetHigh.toFixed(1)}h range.`});
+  }
+
+  const weekSched = week.reduce((s,e)=>s+(e.scheduled||0),0);
+  const weekAtt = week.reduce((s,e)=>s+(e.attended||0),0);
+  const target = SETTINGS.attendanceTarget || 75;
+  if(weekSched>0){
+    const pct = weekAtt/weekSched*100;
+    if(pct < target){
+      insights.push({ok:false, html:`<b>Attendance at ${pct.toFixed(0)}% this week</b> — below your ${target}% target. Prioritize your scheduled ${SETTINGS.attendanceLabel.toLowerCase()} for the rest of the month.`});
+    }else{
+      insights.push({ok:true, html:`<b>Attendance healthy at ${pct.toFixed(0)}%</b> this week — comfortably above your ${target}% target.`});
+    }
+  }
+
+  if(prevWeek.length>0 && week.length>0){
+    const prevQual = prevWeek.map(avgQuality).filter(q=>q);
+    const prevAvg = prevQual.length ? prevQual.reduce((a,b)=>a+b,0)/prevQual.length : null;
+    const curQual = week.map(avgQuality).filter(q=>q);
+    const curAvg = curQual.length ? curQual.reduce((a,b)=>a+b,0)/curQual.length : null;
+    if(prevAvg!==null && curAvg!==null){
+      if(curAvg > prevAvg + 0.3){
+        insights.push({ok:true, html:`<b>Quality trending up.</b> Average session quality rose from ${prevAvg.toFixed(1)} to ${curAvg.toFixed(1)} week-over-week — whatever changed, keep doing it.`});
+      }else if(curAvg < prevAvg - 0.3){
+        insights.push({ok:false, html:`<b>Quality trending down.</b> Average session quality dropped from ${prevAvg.toFixed(1)} to ${curAvg.toFixed(1)} week-over-week — check your reflection notes for a recurring distraction.`});
+      }
+    }
+  }
+  list.innerHTML = insights.map(i=>`<div class="insight ${i.ok?'ok':''}">${i.html}</div>`).join('');
+}
+
+// ---------- Init ----------
+(async function init(){
+  await loadTheme();
+  await loadSettings();
+  await loadSyllabusMap();
+  populateSyllabusSubjectSelect();
+  await loadEntryForDate(dateInput.value);
+  await refreshWeekly();
+  await refreshInsights();
+  await refreshStamp();
+})();
+
+// ---------- Install as an app (PWA) ----------
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{
+      // Fails silently if not served from a real host (e.g. opened as a local file) — the app still works fully in-browser.
+    });
+  });
+}
+</script>
+</body>
+</html>
